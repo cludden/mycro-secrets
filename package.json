@@ -1,0 +1,36 @@
+{
+  "name": "mycro-secrets",
+  "version": "0.0.0",
+  "description": "mycro hook for loading secrets from the environment or a vault server",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha test/tests/bootstrap.test.js test/tests/**/*.test.js --recursive"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cludden/mycro-secrets.git"
+  },
+  "keywords": [
+    "mycro",
+    "hook",
+    "vault",
+    "restify",
+    "microservice",
+    "restify-microservice",
+    "secrets",
+    "environment"
+  ],
+  "author": "chris ludden",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/cludden/mycro-secrets/issues"
+  },
+  "homepage": "https://github.com/cludden/mycro-secrets#readme",
+  "dependencies": {
+    "async": "^1.5.2",
+    "axios": "^0.9.1",
+    "joi": "^7.2.3",
+    "lodash": "^4.2.1",
+    "ms": "^0.7.1"
+  }
+}
