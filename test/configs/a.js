@@ -52,8 +52,16 @@ module.exports = {
     validate: [function(joi) {
         return joi.object({
             aws: joi.object({
-                accessKeyId: joi.string(),
-                secretAccessKey: joi.string(),
+                accessKeyId: joi.when('$env', {
+                    is: joi.string().valid('development', 'test'),
+                    then: joi.string().required(),
+                    otherwise: joi.string()
+                }),
+                secretAccessKey: joi.when('$env', {
+                    is: joi.string().valid('development', 'test'),
+                    then: joi.string().required(),
+                    otherwise: joi.string()
+                }),
                 s3: joi.object({
                     bucket: joi.string().required(),
                     region: joi.string().default('us-west-2')
@@ -76,7 +84,10 @@ module.exports = {
         });
     }, {}],
 
-    vault: function() {
-        return '/documents/init';
+    vault: {
+        '/documents/aws': 'aws',
+        '/documents/bugsnag': 'bugsnag',
+        '/documents/mongo': 'mongo',
+        '/documents/s3': 'aws.s3'
     }
 };

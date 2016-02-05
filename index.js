@@ -19,6 +19,12 @@ var delayCallback = function(currentBackoff, maxBackoff, step, callback, context
     }, timeout);
 };
 
+function draw(map, env) {
+    return _.transform(map, function(result, value, key) {
+        _.set(result, value, env[key] || {});
+    }, {});
+}
+
 function map(obj, env) {
     env = env || process.env;
     if (_.isString(obj)) {
@@ -33,22 +39,6 @@ function map(obj, env) {
             result[key] = value;
         }
     }, {});
-}
-
-function pluckPaths(obj, paths) {
-    paths = _.isArray(paths) ? paths : [];
-    if (_.isString(obj)) {
-        paths.push(obj);
-    } else if (_.isPlainObject(obj)) {
-        _.values(obj).forEach(function(value) {
-            if (_.isString(value) && paths.indexOf(value) === -1) {
-                paths.push(value);
-            } else if (_.isPlainObject(value)) {
-                pluckPaths(value, paths);
-            }
-        });
-    }
-    return paths;
 }
 
 function refer(value) {
@@ -66,6 +56,7 @@ module.exports = function Secrets(done) {
         }
     });
 
+    let schema, options;
     async.auto({
         // validate hook config
         config: function validateHookConfig(fn) {
@@ -86,28 +77,38 @@ module.exports = function Secrets(done) {
                     err.message = 'Invalid `secrets` config: ' + err.message;
                     return fn(err);
                 }
-                fn(null, validated);
+
+                schema = validated.validate[0];
+                options = validated.validate[1];
+
+                // apply validation defaults
+                options = _.merge({}, {
+                    allowUnknown: true,
+                    convert: true,
+                    context: {
+                        env: process.env.NODE_ENV
+                    }
+                }, options);
+
+                try {
+                    schema = schema(joi);
+                    return fn(null, validated);
+                } catch (e) {
+                    return fn(e);
+                }
             });
         },
 
         // attempt to locate secrets in the environment
         env: ['config', function validateEnv(fn, r) {
-            let envSecrets = map(config.env),
-                schema = r.config.validate[0],
-                options = r.config.validate[1];
-
-            // apply validation defaults
-            _.defaults(options, {
-                allowUnknown: true,
-                convert: true
-            });
-
             try {
-                schema = schema(joi);
-                schema.options(options);
-                envSecrets = joi.attempt(envSecrets, schema);
+                let envSecrets = map(config.env),
+                    result = joi.validate(envSecrets, schema, options);
+                if (result.error) {
+                    throw result.error;
+                }
                 mycro.secrets = function(path) {
-                    let secrets = _.cloneDeep(envSecrets);
+                    let secrets = _.cloneDeep(result.value);
                     return _.isString(path) ? _.get(secrets, path) : secrets;
                 };
                 fn(null, true);
@@ -148,7 +149,7 @@ module.exports = function Secrets(done) {
                 return fn();
             }
             // get an array of vault paths to fetch
-            let paths = pluckPaths(config.vault),
+            let paths = _.keys(config.vault),
                 baseUrl = r.vault.url + (r.vault.url.charAt(-1) === '/' ? '' : '/') + 'v1/secret' + (r.vault.prefix || '');
 
             // define delays
@@ -185,6 +186,13 @@ module.exports = function Secrets(done) {
                             };
                             __fn(null, result);
                         }).catch(function(response) {
+                            if (response.status === 404) {
+                                let result = {
+                                    path: path,
+                                    data: {}
+                                };
+                                return __fn(null, result);
+                            }
                             __fn(new Error(response));
                         });
                     }, function(err, results) {
@@ -196,13 +204,24 @@ module.exports = function Secrets(done) {
                                 memo[result.path] = result.data;
                                 return memo;
                             }, {});
-                            let vaultSecrets = map(config.vault, env);
-                            mycro.secrets = function(path) {
-                                let secrets = _.cloneDeep(vaultSecrets);
-                                return _.isString(path) ? _.get(secrets, path) : secrets;
-                            };
-                            exchanged = true;
-                            _fn();
+                            try {
+                                let vaultSecrets = draw(config.vault, env),
+                                    result = joi.validate(vaultSecrets, schema, options);
+                                if (result.error) {
+                                    throw result.error;
+                                }
+                                mycro.secrets = function(path) {
+                                    let secrets = _.cloneDeep(result.value);
+                                    return _.isString(path) ? _.get(secrets, path) : secrets;
+                                };
+                                exchanged = true;
+                                _fn();
+                            } catch (e) {
+                                mycro.log('error', new Error('Invalid secrets received from vault: ' + (e.message || e)));
+                                console.error(process.env.NODE_ENV);
+                                console.error(e);
+                                delayCallback(currentBackoff, maxBackoff, step, _fn, config.__clock || global);
+                            }
                         }
                     });
                 },

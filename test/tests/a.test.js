@@ -136,13 +136,14 @@ describe('config: a', function() {
                 this.timeout(ms('10s'));
                 this.clock.tick(ms('35s'));
                 setTimeout(() => {
-                    expect(count).to.equal(2);
+                    expect(count).to.equal(8);
                     done();
                 }, 50);
             });
         });
 
         describe('vault available', function() {
+            this.timeout(ms('2s'));
             let mycro, request;
 
             before(function(done) {
@@ -153,19 +154,50 @@ describe('config: a', function() {
                 process.env.VAULT_URL = 'https://api.example.com';
                 process.env.VAULT_TOKEN = 'super-secret-vault-token';
                 process.env.VAULT_PREFIX = '/vault';
+                process.env.NODE_ENV = 'production';
 
                 // define custom adapter to intercept vault requests and fail
                 axios.defaults.adapter = function(resolve, reject, config) {
-                    resolve({
-                        data: {
-                            data: _.transform(required, function(memo, value, key) {
-                                _.set(memo, value[value.length - 1], value[value.length === 3 ? 1 : 0]);
-                            }, {})
+                    let secrets = {
+                        bugsnag: {
+                            'api-key': 'bugsnag8888'
                         },
-                        status: 200,
-                        statusText: 'success',
-                        config: config
-                    });
+                        mongo: {
+                            database: 'sample-db',
+                            host: 'localhost',
+                            password: '2340909348',
+                            username: 'sample-user'
+                        },
+                        s3: {
+                            bucket: 'sample-bucket',
+                            region: 'us-east-1'
+                        }
+                    };
+                    let data;
+                    if (/^.+\/bugsnag$/.test(config.url.url)) {
+                        data = secrets.bugsnag;
+                    }
+                    if (/^.+\/mongo$/.test(config.url.url)) {
+                        data = secrets.mongo;
+                    }
+                    if (/^.+\/s3$/.test(config.url.url)) {
+                        data = secrets.s3;
+                    }
+                    if (data) {
+                        resolve({
+                            data: {data: data},
+                            status: 200,
+                            statusText: 'OK',
+                            config: config
+                        });
+                    } else {
+                        reject({
+                            data: {},
+                            status: 404,
+                            statusText: 'Not Found',
+                            config: config
+                        });
+                    }
                 };
 
                 mycro = new Mycro();
@@ -187,9 +219,11 @@ describe('config: a', function() {
             });
 
             _.each(required, function(value, key) {
-                it('should correctly set path `' + _.last(value) + '` with variable `' + key + '`', function() {
-                    expect(mycro.secrets(_.last(value))).to.equal(value.length === 3 ? value[1] : value[0]);
-                });
+                if (key !== 'AWS_ACCESS_KEY_ID' && key !== 'AWS_SECRET_ACCESS_KEY') {
+                    it('should correctly set path `' + _.last(value) + '` with variable `' + key + '`', function() {
+                        expect(mycro.secrets(_.last(value))).to.equal(value.length === 3 ? value[1] : value[0]);
+                    });
+                }
             });
         });
     });
