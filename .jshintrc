@@ -1,4 +1,12 @@
 {
     "esnext": true,
-    "node": true
+    "node": true,
+    "predef": [
+        "after",
+        "before",
+        "context",
+        "describe",
+        "it",
+        "mycro"
+    ]
 }

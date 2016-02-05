@@ -7,22 +7,23 @@ var async = require('async'),
     secrets,
     _ = require('lodash');
 
-function delayCallback(currentBackoff, maxBackoff, step, callback) {
-    if (_.isFunction(step)) {
-        callback = step;
-        step = false;
-    }
+var delayCallback = function(currentBackoff, maxBackoff, step, callback, context) {
     let timeout = currentBackoff;
     if (timeout > maxBackoff) {
         timeout = maxBackoff;
     } else {
         currentBackoff = step ? currentBackoff + step : currentBackoff * 2;
     }
-    setTimeout(callback, timeout);
-}
+    context.setTimeout(function() {
+        callback();
+    }, timeout);
+};
 
 function map(obj, env) {
     env = env || process.env;
+    if (_.isString(obj)) {
+        return env[obj];
+    }
     return _.transform(obj, function(result, value, key) {
         if (_.isPlainObject(value)) {
             result[key] = map(value, env);
@@ -69,10 +70,11 @@ module.exports = function Secrets(done) {
         // validate hook config
         config: function validateHookConfig(fn) {
             joi.validate(mycro._config.secrets, joi.object({
+                __clock: joi.object().optional(),
                 env: joi.object().default({}),
-                fetchVaultInfo: joi.function().arity(1).optional(),
+                fetchVaultInfo: joi.func().arity(1).optional(),
                 validate: joi.array().ordered(
-                    joi.function().arity(1).required(),
+                    joi.func().arity(1).required(),
                     joi.object().default({})
                 ).single(),
                 vault: joi.alternatives().try(
@@ -101,9 +103,13 @@ module.exports = function Secrets(done) {
             });
 
             try {
-                schema = schema(joi).options(options);
-                envSecrets = joi.attempt(secrets, schema);
-                mycro.secrets = _.constant(envSecrets);
+                schema = schema(joi);
+                schema.options(options);
+                envSecrets = joi.attempt(envSecrets, schema);
+                mycro.secrets = function(path) {
+                    let secrets = _.cloneDeep(envSecrets);
+                    return _.isString(path) ? _.get(secrets, path) : secrets;
+                };
                 fn(null, true);
             } catch (e) {
                 mycro.log('silly', '[Secrets]', 'Insufficient environment variables present.');
@@ -117,7 +123,15 @@ module.exports = function Secrets(done) {
                 return fn();
             }
             if (_.isFunction(config.fetchVaultInfo)) {
-                return config.fetchVaultInfo(fn);
+                return config.fetchVaultInfo(function(err, info) {
+                    if (err) {
+                        return fn(err);
+                    }
+                    if (!info.url || !info.token) {
+                        return fn(new Error('Missing required vault info'));
+                    }
+                    fn(null, info);
+                });
             }
             let info = _.pick(process.env, ['VAULT_PREFIX', 'VAULT_TOKEN', 'VAULT_URL']);
             if (info.VAULT_TOKEN && info.VAULT_URL) {
@@ -133,16 +147,25 @@ module.exports = function Secrets(done) {
             if (r.env) {
                 return fn();
             }
-
             // get an array of vault paths to fetch
             let paths = pluckPaths(config.vault),
                 baseUrl = r.vault.url + (r.vault.url.charAt(-1) === '/' ? '' : '/') + 'v1/secret' + (r.vault.prefix || '');
 
             // define delays
-            let backoffs = config.backoff,
-                currentBackoff = ms(backoffs.first) || ms('30s'),
-                maxBackoff = ms(backoffs.max) || ms('10m'),
+            let backoffs = config.backoff || {},
+                currentBackoff = ms(backoffs.first),
+                maxBackoff = ms(backoffs.max),
                 step = ms(backoffs.step);
+
+            if (isNaN(currentBackoff)) {
+                currentBackoff = ms('30s');
+            }
+            if (isNaN(maxBackoff)) {
+                maxBackoff = ms('10m');
+            }
+            if (isNaN(step)) {
+                step = false;
+            }
 
             // attempt to fetch secrets indefinitely, with increasing backoff after each failed attempt
             let exchanged = false;
@@ -160,20 +183,25 @@ module.exports = function Secrets(done) {
                                 path: path,
                                 data: response.data.data
                             };
-                            fn(null, result);
+                            __fn(null, result);
                         }).catch(function(response) {
                             __fn(new Error(response));
                         });
                     }, function(err, results) {
                         if (err) {
                             mycro.log('error', new Error('Vault communication error: ' + (err.message || err)));
-                            delayCallback(currentBackoff, maxBackoff, step, _fn);
+                            delayCallback(currentBackoff, maxBackoff, step, _fn, config.__clock || global);
                         } else {
                             let env = _.reduce(results, function(memo, result) {
                                 memo[result.path] = result.data;
+                                return memo;
                             }, {});
                             let vaultSecrets = map(config.vault, env);
-                            mycro.secrets = _.constant(vaultSecrets);
+                            mycro.secrets = function(path) {
+                                let secrets = _.cloneDeep(vaultSecrets);
+                                return _.isString(path) ? _.get(secrets, path) : secrets;
+                            };
+                            exchanged = true;
                             _fn();
                         }
                     });
