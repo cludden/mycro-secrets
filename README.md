@@ -218,7 +218,7 @@ module.exports = {
 **Note** The `validate` key can also be defined as an array in the format of [validateFunction, validateOptions]
 
 ---
-**validate**  
+**vault**  
 `@type {function|object|string}` *required*  
 A `secrets` map that this hook will use to try and satisfy the secrets requirements using vault paths. Each key in the map represents a vault secret, and each value represents the path to set in the final `secrets` object. In the following example, the hook will issue GET requests for the following secrets from vault.
 
