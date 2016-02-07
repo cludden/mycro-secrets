@@ -146,6 +146,22 @@ describe('config: a', function() {
             this.timeout(ms('2s'));
             let mycro, request;
 
+            var secrets = {
+                bugsnag: {
+                    'api-key': 'bugsnag8888'
+                },
+                mongo: {
+                    database: 'sample-db',
+                    host: 'localhost',
+                    password: '2340909348',
+                    username: 'sample-user'
+                },
+                s3: {
+                    bucket: 'sample-bucket',
+                    region: 'us-east-1'
+                }
+            };
+
             before(function(done) {
                 // clear environment
                 _.keys(required).forEach(function(variable) {
@@ -158,21 +174,6 @@ describe('config: a', function() {
 
                 // define custom adapter to intercept vault requests and fail
                 axios.defaults.adapter = function(resolve, reject, config) {
-                    let secrets = {
-                        bugsnag: {
-                            'api-key': 'bugsnag8888'
-                        },
-                        mongo: {
-                            database: 'sample-db',
-                            host: 'localhost',
-                            password: '2340909348',
-                            username: 'sample-user'
-                        },
-                        s3: {
-                            bucket: 'sample-bucket',
-                            region: 'us-east-1'
-                        }
-                    };
                     let data;
                     if (/^.+\/bugsnag$/.test(config.url.url)) {
                         data = secrets.bugsnag;
@@ -218,12 +219,20 @@ describe('config: a', function() {
                     .end(done);
             });
 
-            _.each(required, function(value, key) {
-                if (key !== 'AWS_ACCESS_KEY_ID' && key !== 'AWS_SECRET_ACCESS_KEY') {
-                    it('should correctly set path `' + _.last(value) + '` with variable `' + key + '`', function() {
-                        expect(mycro.secrets(_.last(value))).to.equal(value.length === 3 ? value[1] : value[0]);
-                    });
-                }
+            it('should correctly set key `aws`', function() {
+                expect(mycro.secrets('aws.s3')).to.have.property('bucket', secrets.s3.bucket);
+                expect(mycro.secrets('aws.s3')).to.have.property('region', secrets.s3.region);
+            });
+
+            it('should correctly set key `bugsnag`', function() {
+                expect(mycro.secrets('bugsnag')).to.have.property('api-key', secrets.bugsnag['api-key']);
+            });
+
+            it('should correctly set key `mongo`', function() {
+                let mongo = mycro.secrets('mongo');
+                _.each(secrets.mongo, function(value, key) {
+                    expect(mongo).to.have.property(key, value);
+                });
             });
         });
     });
