@@ -18,36 +18,30 @@ function convertToTestVar(obj) {
 module.exports = {
     env: function() {
         return convertToTestVar({
-            aws: {
-                accessKeyId: 'AWS_ACCESS_KEY_ID',
-                secretAccessKey: 'AWS_SECRET_ACCESS_KEY',
-                s3: {
-                    bucket: 'BUCKET',
-                    region: 'REGION'
-                }
-            },
-            bugsnag: {
-                'api-key': 'BUGSNAG_API_KEY'
-            },
-            env: 'NODE_ENV',
-            mongo: {
-                database: 'MONGO_DB',
-                host: 'MONGO_HOST',
-                password: 'MONGO_PASSWORD',
-                port: 'MONGO_PORT',
-                url: 'MONGO_URL',
-                username: 'MONGO_USERNAME'
-            }
+            'AWS_ACCESS_KEY_ID': 'aws.accessKeyId',
+            'AWS_SECRET_ACCESS_KEY': 'aws.secretAccessKey',
+            'BUCKET': 'aws.s3.bucket',
+            'BUGSNAG_API_KEY': 'bugsnag.api-key',
+            'MONGO_DB': 'mongo.database',
+            'MONGO_HOST': 'mongo.host',
+            'MONGO_PASSWORD': 'mongo.password',
+            'MONGO_PORT': 'mongo.port',
+            'MONGO_URL': 'mongo.url',
+            'MONGO_USERNAME': 'mongo.username',
+            'NODE_ENV': 'env',
+            'REGION': 'aws.s3.region'
         });
     },
 
     fetchVaultInfo: function(done) {
         return done(null, {
-            prefix: 'documents',
+            prefix: '/v1/secret/documents',
             token: process.env.VAULT_TOKEN,
             url: process.env.VAULT_URL
         });
     },
+
+    logValidationErrors: true,
 
     validate: [function(joi) {
         return joi.object({
@@ -65,8 +59,8 @@ module.exports = {
                 s3: joi.object({
                     bucket: joi.string().required(),
                     region: joi.string().default('us-west-2')
-                })
-            }),
+                }).required()
+            }).required(),
             bugsnag: joi.object({
                 'api-key': joi.string().required()
             }),
@@ -80,7 +74,7 @@ module.exports = {
                 port: joi.number().integer().default(27017),
                 url: joi.string(),
                 username: joi.string().required()
-            }).or('host', 'url').with('host', 'database')
+            }).or('host', 'url').with('host', 'database').required()
         });
     }, {}],
 
