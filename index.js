@@ -58,7 +58,7 @@ module.exports = function Secrets(done) {
                 __clock: joi.object().optional(),
                 env: joi.object().default({}),
                 fetchVaultInfo: joi.func().arity(1).optional(),
-                logValidationErrors: joi.boolean().default(false),
+                logValidationErrors: joi.boolean().optional(),
                 validate: joi.array().ordered(
                     joi.func().arity(1).required(),
                     joi.object().default({})
@@ -112,7 +112,6 @@ module.exports = function Secrets(done) {
                     let secrets = _.cloneDeep(result.value);
                     return _.isString(path) ? _.get(secrets, path) : secrets;
                 };
-                console.log('validation', result);
                 fn(null, true);
             } catch (e) {
                 mycro.log('silly', '[Secrets]', 'Insufficient environment variables present.');

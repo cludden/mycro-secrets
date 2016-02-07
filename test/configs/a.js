@@ -41,7 +41,7 @@ module.exports = {
         });
     },
 
-    logValidationErrors: true,
+    //logValidationErrors: true,
 
     validate: [function(joi) {
         return joi.object({
