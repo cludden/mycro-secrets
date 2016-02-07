@@ -19,6 +19,32 @@ This basic process performed by this hook is described below:
 
 
 ## General Usage
+Basic:
+
+```javascript
+console.log(mycro.secrets());
+//  {
+//      aws: {
+//          accessKeyId: ***,
+//          secretAccessKey: ***,
+//          s3: {
+//              bucket: ***,
+//              region: ***
+//          }
+//      },
+//      bugsnag: {
+//          api-key: ***
+//      },
+//      mongo: {
+//          database: ***,
+//          host: ***,
+//          password: ***,
+//          port: ***,
+//          username: ***
+//      }
+//  }
+```
+
 In configuration files:
 
 ```javascript
@@ -193,11 +219,11 @@ module.exports = {
                 s3: joi.object({
                     bucket: joi.string().required(),
                     region: joi.string().default('us-west-2')
-                })
-            }),
+                }).required()
+            }).required(),
             bugsnag: joi.object({
                 'api-key': joi.string().required()
-            }),
+            }).required(),
             mongo: joi.object({
                 database: joi.string(),
                 host: joi.string(),
@@ -205,7 +231,7 @@ module.exports = {
                 port: joi.number().integer().default(27017),
                 url: joi.string(),
                 username: joi.string().required()
-            }).or('host', 'url').with('host', 'database')
+            }).or('host', 'url').with('host', 'database').required()
         });
     }
     // ..
@@ -218,9 +244,9 @@ module.exports = {
 `@type {function|object|string}` *required*  
 A `secrets` map that this hook will use to try and satisfy the secrets requirements using vault paths. Each key in the map represents a vault secret, and each value represents the path to set in the final `secrets` object. In the following example, the hook will issue GET requests for the following secrets from vault.
 
- - `{VAULT_URL}/{[VAULT_PREFIX]}/v1/secret/my-service/aws`
- - `{VAULT_URL}/{[VAULT_PREFIX]}/v1/secret/my-service/mongo}`
- - `{VAULT_URL}/{[VAULT_PREFIX]}/v1/secret/my-service/s3`
+ - `{VAULT_URL}/[{VAULT_PREFIX}/]my-service/aws`
+ - `{VAULT_URL}/[{VAULT_PREFIX}/]my-service/mongo}`
+ - `{VAULT_URL}/{[{VAULT_PREFIX}/]my-service/s3`
 
 If any of the requests fail, this hook will continue attempting to contact vault at increasing intervals until a successful response is received. The reason for this is because, in the event that the vault service is down, you can focus on bringing it back online, and not have to worry about restarting all dependent services afterwards.
 
