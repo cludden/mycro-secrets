@@ -185,8 +185,7 @@ module.exports = function Secrets(done) {
                 function fetchSecrets(_fn) {
                     async.mapLimit(paths, 5, function(path, __fn) {
                         let url = baseUrl + path;
-                        axios.get({
-                            url: url,
+                        axios.get(url, {
                             headers: _.merge({}, r.vault.headers || {}, {
                                 'x-vault-token': r.vault.token
                             })
@@ -204,11 +203,11 @@ module.exports = function Secrets(done) {
                                 };
                                 return __fn(null, result);
                             }
-                            __fn(new Error(response));
+                            __fn(response);
                         });
                     }, function(err, results) {
                         if (err) {
-                            mycro.log('error', new Error('Vault communication error: ' + (err.message || err)));
+                            mycro.log('error', 'Vault communication error:', err);
                             delayCallback(currentBackoff, maxBackoff, step, _fn, config.__clock || global);
                         } else {
                             let env = _.reduce(results, function(memo, result) {
@@ -229,8 +228,6 @@ module.exports = function Secrets(done) {
                                 _fn();
                             } catch (e) {
                                 mycro.log('error', new Error('Invalid secrets received from vault: ' + (e.message || e)));
-                                console.error(process.env.NODE_ENV);
-                                console.error(e);
                                 delayCallback(currentBackoff, maxBackoff, step, _fn, config.__clock || global);
                             }
                         }
