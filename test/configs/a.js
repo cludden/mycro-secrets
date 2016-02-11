@@ -35,6 +35,9 @@ module.exports = {
 
     fetchVaultInfo: function(done) {
         return done(null, {
+            headers: {
+                'apiKey': 'abcdefg'
+            },
             prefix: '/v1/secret/documents',
             token: process.env.VAULT_TOKEN,
             url: process.env.VAULT_URL
