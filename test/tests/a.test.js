@@ -144,7 +144,7 @@ describe('config: a', function() {
 
         describe('vault available', function() {
             this.timeout(ms('2s'));
-            let mycro, request;
+            let mycro, request, headers;
 
             var secrets = {
                 bugsnag: {
@@ -174,6 +174,11 @@ describe('config: a', function() {
 
                 // define custom adapter to intercept vault requests and fail
                 axios.defaults.adapter = function(resolve, reject, config) {
+                    if (!headers || !headers.length) {
+                        headers = [];
+                    }
+                    headers.push(_.merge(config.headers, config.url.headers || {}));
+
                     let data;
                     if (/^.+\/bugsnag$/.test(config.url.url)) {
                         data = secrets.bugsnag;
@@ -213,10 +218,15 @@ describe('config: a', function() {
                 delete axios.defaults.adapter;
             });
 
+
             it('the app should start successfully', function(done) {
                 request.get('/healthy')
                     .expect(200)
                     .end(done);
+            });
+
+            it('should allow custom headers to be sent with the vault request', function() {
+                expect(headers[0]).to.have.property('apiKey');
             });
 
             it('should correctly set key `aws`', function() {

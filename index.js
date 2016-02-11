@@ -180,9 +180,9 @@ module.exports = function Secrets(done) {
                         let url = baseUrl + path;
                         axios.get({
                             url: url,
-                            headers: {
+                            headers: _.merge({}, r.vault.headers || {}, {
                                 'x-vault-token': r.vault.token
-                            }
+                            })
                         }).then(function(response) {
                             let result = {
                                 path: path,

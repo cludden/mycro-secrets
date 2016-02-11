@@ -175,7 +175,10 @@ module.exports = function(mycro) {
             if (['production', 'staging'].indexOf(process.env.NODE_ENV) === -1) {
                 return done(null, {
                     token: process.env.VAULT_TOKEN
-                    url: process.env.VAULT_URL
+                    url: process.env.VAULT_URL,
+                    headers: {
+                        // optional additional headers to send with vault requests
+                    }
                 });
             }
             // do something asynchronous here to receive vault info
