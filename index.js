@@ -157,7 +157,7 @@ module.exports = function Secrets(done) {
                 baseUrl = _.trimEnd(r.vault.url, '/');
 
             if (r.vault.prefix) {
-                if (r.vault.prefix.slice(0,1) !== '/') {
+                if (r.vault.prefix.charAt(0) !== '/') {
                     r.vault.prefix = '/' + r.vault.prefix;
                 }
                 baseUrl += r.vault.prefix;
