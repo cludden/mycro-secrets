@@ -154,7 +154,14 @@ module.exports = function Secrets(done) {
             }
             // get an array of vault paths to fetch
             let paths = _.keys(config.vault),
-                baseUrl = r.vault.url + (r.vault.url.charAt(-1) === '/' ? '' : '/') + (r.vault.prefix || '');
+                baseUrl = _.trimEnd(r.vault.url, '/');
+
+            if (r.vault.prefix) {
+                if (r.vault.prefix.charAt(0) !== '/') {
+                    r.vault.prefix = '/' + r.vault.prefix;
+                }
+                baseUrl += r.vault.prefix;
+            }
 
             // define delays
             let backoffs = config.backoff || {},
