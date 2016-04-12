@@ -1,243 +1,200 @@
 'use strict';
 
-var async = require('async'),
-    axios = require('axios'),
-    joi = require('joi'),
-    ms = require('ms'),
-    secrets,
-    _ = require('lodash');
+const async = require('async');
+const AWS = require('aws-sdk');
+const axios = require('axios');
+const joi = require('joi');
+const ms = require('ms');
+const _ = require('lodash');
 
-var delayCallback = function(currentBackoff, maxBackoff, step, callback, context) {
-    let timeout = currentBackoff;
-    if (timeout > maxBackoff) {
-        timeout = maxBackoff;
-    } else {
-        currentBackoff = step ? currentBackoff + step : currentBackoff * 2;
+module.exports = function secrets(done) {
+    const mycro = this;
+
+    // get secrets config
+    const secretsConfig = _.get(mycro, '_config.secrets') || {};
+    let result = joi.validate(secretsConfig, joi.object({
+        attempts: joi.number().integer(),
+        configId: joi.string().required(),
+        interval: joi.alternatives().try(
+            joi.number().integer(),
+            joi.string()
+        ),
+        region: joi.string().required(),
+        tableName: joi.string().required(),
+        validate: joi.func()
+    }).unknown(true).required());
+    if (result.error) {
+        return async.setImmediate(function() {
+            done(result.error);
+        });
     }
-    context.setTimeout(function() {
-        callback();
-    }, timeout);
-};
-
-function draw(map, env) {
-    return _.transform(map, function(result, value, key) {
-        if (!_.isUndefined(env[key])) {
-            _.set(result, value, env[key] || {});
+    if (_.isString(secretsConfig.attempts)) {
+        secretsConfig.attempts = ms(secretsConfig.attempts);
+        if (!secretsConfig.attempts) {
+            secretsConfig.attempts = ms('30s');
         }
-    }, {});
-}
-
-function map(obj, env) {
-    env = env || process.env;
-    if (_.isString(obj)) {
-        return env[obj];
     }
-    return draw(obj, env);
-}
 
-function refer(value) {
-    return value;
-}
+    // configure AWS sdk
+    const config = _.extend({
+        region: _.get(mycro, '_config.secrets.region') || 'us-west-2'
+    }, {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    });
+    AWS.config.update(config);
 
-module.exports = function Secrets(done) {
-    let mycro = this,
-        config = mycro._config.secrets;
-
-    // resolve function attributes
-    ['env', 'vault'].forEach(function(key) {
-        if (_.isFunction(config[key])) {
-            config[key] = config[key]();
-        }
+    // instantiate new dynamo db doc client
+    const dynamo = mycro.dynamo || new AWS.DynamoDB.DocumentClient({
+        sslEnabled: true
     });
 
-    let schema, options;
     async.auto({
-        // validate hook config
-        config: function validateHookConfig(fn) {
-            joi.validate(mycro._config.secrets, joi.object({
-                __clock: joi.object().optional(),
-                env: joi.object().default({}),
-                fetchVaultInfo: joi.func().arity(1).optional(),
-                logValidationErrors: joi.boolean().optional(),
-                validate: joi.array().ordered(
-                    joi.func().arity(1).required(),
-                    joi.object().default({})
-                ).single(),
-                vault: joi.alternatives().try(
-                    joi.string(),
-                    joi.object()
-                )
-            }), {presence: 'required'}, function(err, validated) {
+        // retrieve service config from dynamo db
+        config: function getConfigFromDynamoDB(fn) {
+            dynamo.get({
+                TableName: secretsConfig.tableName,
+                Key: {
+                    id: secretsConfig.configId
+                }
+            }, function(err, data) {
                 if (err) {
-                    err.message = 'Invalid `secrets` config: ' + err.message;
-                    if (config.logValidationErrors === true) {
-                        mycro.log('error', err);
-                    }
+                    let errMsg = `Error retrieving service config from dynamodb`;
+                    mycro.log('error', errMsg, err);
                     return fn(err);
                 }
-
-                schema = validated.validate[0];
-                options = validated.validate[1];
-
-                // apply validation defaults
-                options = _.merge({}, {
-                    allowUnknown: true,
-                    convert: true,
-                    context: {
-                        env: process.env.NODE_ENV
-                    }
-                }, options);
-
-                try {
-                    schema = schema(joi);
-                    return fn(null, validated);
-                } catch (e) {
-                    if (config.logValidationErrors === true) {
-                        mycro.log('error', 'Invalid `validate` key:', e);
-                    }
-                    return fn(e);
-                }
+                mycro.log('silly', `Successfully retreived service config from dynamo db`);
+                fn(null, data.Item);
             });
         },
 
-        // attempt to locate secrets in the environment
-        env: ['config', function validateEnv(fn, r) {
-            try {
-                let envSecrets = map(config.env),
-                    result = joi.validate(envSecrets, schema, options);
-                if (result.error) {
-                    throw result.error;
+        // validate the config object received from dynamodb
+        validated: ['config', function validateServiceConfig(fn, r) {
+            let configSchema = joi.object({
+                secrets: joi.object().required(),
+                vault: joi.object({
+                    token: joi.string(),
+                    'test-token': joi.string(),
+                    url: joi.string().required()
+                }).required()
+            }).required();
+
+            joi.validate(r.config, configSchema, {
+                allowUnknown: true
+            }, function(err, validated) {
+                if (err) {
+                    mycro.log('error', `Invalid config document retreived from dynamodb`, err);
+                    return fn(err);
                 }
-                mycro.secrets = function(path) {
-                    let secrets = _.cloneDeep(result.value);
-                    return _.isString(path) ? _.get(secrets, path) : secrets;
-                };
-                fn(null, true);
-            } catch (e) {
-                mycro.log('silly', '[Secrets]', 'Insufficient environment variables present.');
-                if (config.logValidationErrors === true) {
-                    mycro.log('error', e);
-                }
-                fn();
-            }
+                mycro.log('silly', `Successfully validated service config`);
+                fn(null, validated);
+            });
         }],
 
-        // attempt to locate vault info
-        vault: ['env', function fetchVaultInfo(fn, r) {
-            if (r.env) {
-                return fn();
-            }
-            if (_.isFunction(config.fetchVaultInfo)) {
-                return config.fetchVaultInfo(function(err, info) {
-                    if (err) {
-                        return fn(err);
-                    }
-                    if (!info.url || !info.token) {
-                        return fn(new Error('Missing required vault info'));
-                    }
-                    fn(null, info);
+        // fetch required secrets from vault
+        secrets: ['validated', function fetchSecretsFromVault(fn, r) {
+            let config = flattenPaths(r.validated.secrets, r.validated.vault.url);
+            let env = process.env.NODE_ENV || 'development';
+            let prodToken = r.validated.vault.token;
+            let testToken = r.validated.vault['test-token'];
+            let devToken = process.env.VAULT_TOKEN;
+            let devTestToken = process.env.VAULT_TOKEN_TEST;
+            let token = env === 'test' ? (devTestToken || testToken) : (devToken || prodToken);
+            if (!token) {
+                return async.setImmediate(function() {
+                    fn(new Error(`Missing required vault token`));
                 });
             }
-            let info = _.pick(process.env, ['VAULT_PREFIX', 'VAULT_TOKEN', 'VAULT_URL']);
-            if (info.VAULT_TOKEN && info.VAULT_URL) {
-                return fn(null, _.mapKeys(info, function(v, k) {
-                    return k.replace('VAULT_', '').toLowerCase();
-                }));
-            }
-            fn(new Error('Unable to locate vault info (url and/or token)'));
+
+            let secrets = {};
+            async.each(Object.keys(config), function(path, _fn) {
+                let pathToSet = config[path];
+                let response = null;
+                let task = function requestFromVault(__fn) {
+                    axios.get(path, {
+                        headers: {
+                            'X-Vault-Token': token
+                        }
+                    }).then(function(r) {
+                        let data = _.get(r, 'data.data');
+                        if (!data) {
+                            return __fn(new Error(`Invalid response from vault. No \`data\` key found in responsebody.`));
+                        }
+                        mycro.log('silly', `Successfully retreived secret from vault (` + path + `)`);
+                        _.set(secrets, pathToSet, data);
+                        response = r;
+                        __fn();
+                    }).catch(function(response) {
+                        mycro.log('error', `There was an error requesting a secret from vault: ` + path, response);
+                        setTimeout(function() {
+                            if (!secretsConfig.attempts) {
+                                __fn(response);
+                            } else {
+                                __fn();
+                            }
+                        }, secretsConfig.interval);
+                    });
+                };
+                if (!secretsConfig.attempts) {
+                    async.doUntil(
+                        task,
+                        function test() {
+                            return response !== null;
+                        },
+                        _fn
+                    );
+                } else {
+                    async.retry(secretsConfig.attempts, task, _fn);
+                }
+            }, function(err) {
+                if (err) {
+                    mycro.log('error', err);
+                    return fn(err);
+                }
+                fn(null, secrets);
+
+            });
         }],
 
-        // attempt to fetch secrets from vault
-        fetch: ['vault', function contactVault(fn, r) {
-            if (r.env) {
-                return fn();
+        validate: ['secrets', function(fn, r) {
+            if (!secretsConfig.validate) {
+                return async.setImmediate(fn);
             }
-            // get an array of vault paths to fetch
-            let paths = _.keys(config.vault),
-                baseUrl = _.trimEnd(r.vault.url, '/');
-
-            if (r.vault.prefix) {
-                if (r.vault.prefix.charAt(0) !== '/') {
-                    r.vault.prefix = '/' + r.vault.prefix;
+            let schema = secretsConfig.validate(joi);
+            joi.validate(r.secrets, schema, {}, function(err, validated) {
+                if (err) {
+                    return fn(err);
                 }
-                baseUrl += r.vault.prefix;
-            }
-
-            // define delays
-            let backoffs = config.backoff || {},
-                currentBackoff = ms(backoffs.first),
-                maxBackoff = ms(backoffs.max),
-                step = ms(backoffs.step);
-
-            if (isNaN(currentBackoff)) {
-                currentBackoff = ms('30s');
-            }
-            if (isNaN(maxBackoff)) {
-                maxBackoff = ms('10m');
-            }
-            if (isNaN(step)) {
-                step = false;
-            }
-
-            // attempt to fetch secrets indefinitely, with increasing backoff after each failed attempt
-            let exchanged = false;
-            async.doUntil(
-                function fetchSecrets(_fn) {
-                    async.mapLimit(paths, 5, function(path, __fn) {
-                        let url = baseUrl + path;
-                        axios.get(url, {
-                            headers: _.merge({}, r.vault.headers || {}, {
-                                'x-vault-token': r.vault.token
-                            })
-                        }).then(function(response) {
-                            let result = {
-                                path: path,
-                                data: response.data.data
-                            };
-                            __fn(null, result);
-                        }).catch(function(response) {
-                            if (response.status === 404) {
-                                let result = {
-                                    path: path,
-                                    data: {}
-                                };
-                                return __fn(null, result);
-                            }
-                            __fn(response);
-                        });
-                    }, function(err, results) {
-                        if (err) {
-                            mycro.log('error', 'Vault communication error:', err);
-                            delayCallback(currentBackoff, maxBackoff, step, _fn, config.__clock || global);
-                        } else {
-                            let env = _.reduce(results, function(memo, result) {
-                                memo[result.path] = result.data;
-                                return memo;
-                            }, {});
-                            try {
-                                let vaultSecrets = draw(config.vault, env),
-                                    result = joi.validate(vaultSecrets, schema, options);
-                                if (result.error) {
-                                    throw result.error;
-                                }
-                                mycro.secrets = function(path) {
-                                    let secrets = _.cloneDeep(result.value);
-                                    return _.isString(path) ? _.get(secrets, path) : secrets;
-                                };
-                                exchanged = true;
-                                _fn();
-                            } catch (e) {
-                                mycro.log('error', new Error('Invalid secrets received from vault: ' + (e.message || e)));
-                                delayCallback(currentBackoff, maxBackoff, step, _fn, config.__clock || global);
-                            }
-                        }
-                    });
-                },
-                function evaluateExchange() {
-                    return exchanged;
-                },
-                fn
-            );
+                Object.freeze(validated);
+                mycro.secrets = function(path) {
+                    if (!path) {
+                        return validated;
+                    }
+                    return _.get(validated, path);
+                };
+                fn();
+            });
         }]
     }, done);
 };
+
+
+/**
+* Flatten a nested object by concatenating keys
+* @param  {Object} config - the object to flatten
+* @param  {String} [basePath=''] - the parent key
+* @return {Object} the flattened object
+*/
+function flattenPaths(config, basePath) {
+    if (!basePath) {
+        basePath = '';
+    }
+    return _.transform(config, function(result, value, key) {
+        if (_.isString(value)) {
+            result[basePath + key] = value;
+        } else if (_.isObject(value)) {
+            let flattened = flattenPaths(value, basePath + key);
+            _.extend(result, flattened);
+        }
+    }, {});
+}

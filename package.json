@@ -4,7 +4,7 @@
   "description": "mycro hook for loading secrets from the environment or a vault server",
   "main": "index.js",
   "scripts": {
-    "test": "mocha test/tests/bootstrap.test.js test/tests/**/*.test.js --recursive"
+    "test": "mocha test/index.test.js"
   },
   "repository": {
     "type": "git",
@@ -28,6 +28,7 @@
   "homepage": "https://github.com/cludden/mycro-secrets#readme",
   "dependencies": {
     "async": "^1.5.2",
+    "aws-sdk": "^2.3.1",
     "axios": "^0.9.1",
     "joi": "^7.2.3",
     "lodash": "^4.2.1",
