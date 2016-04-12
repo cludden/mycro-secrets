@@ -24,6 +24,7 @@ Most applications require secrets (sensitive data like passwords, api keys, toke
 
 ## Process
 This basic process performed by this hook is described below:
+
 1. Request secret config from DynamoDB
 2. Ensure we understand the config document
 3. Contact vault for all secrets specified in the config document
