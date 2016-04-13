@@ -239,7 +239,7 @@ describe('mycro-secrets', function() {
                 delete axios.defaults.adapter;
                 expect(err).to.not.exist;
                 expect(mycro.secrets).to.be.a('function');
-                expect(mycro.secrets()).to.have.all.keys('bugsnag', 'mongo');
+                expect(mycro.secrets()).to.have.all.keys('bugsnag', 'mongo', 'vault');
                 expect(mycro.secrets('bugsnag.api-key')).to.equal('abcdefg123');
                 expect(mycro.secrets('mongo.url')).to.equal('mongodb://localhost:27017/my-db');
                 done();

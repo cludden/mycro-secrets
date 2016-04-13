@@ -151,29 +151,38 @@ module.exports = function secrets(done) {
                     mycro.log('error', err);
                     return fn(err);
                 }
-                fn(null, secrets);
-
+                fn(null, {
+                    secrets,
+                    vault: {
+                        token: token
+                    }
+                });
             });
         }],
 
+        // validate obtained secrets if applicable
         validate: ['secrets', function(fn, r) {
             if (!secretsConfig.validate) {
-                return async.setImmediate(fn);
+                return async.setImmediate(function() {
+                    fn(null, r.secrets.secrets);
+                });
             }
             let schema = secretsConfig.validate(joi);
-            joi.validate(r.secrets, schema, {}, function(err, validated) {
-                if (err) {
-                    return fn(err);
+            joi.validate(r.secrets.secrets, schema, {}, fn);
+        }],
+
+        // apply defaults and create accessor method on mycro instance
+        publish: ['validate', function(fn, r) {
+            let secrets = r.validate;
+            _.defaults(secrets, _.pick(r.secrets, 'vault'));
+            Object.freeze(secrets);
+            mycro.secrets = function(path) {
+                if (!path) {
+                    return secrets;
                 }
-                Object.freeze(validated);
-                mycro.secrets = function(path) {
-                    if (!path) {
-                        return validated;
-                    }
-                    return _.get(validated, path);
-                };
-                fn();
-            });
+                return _.get(secrets, path);
+            };
+            fn();
         }]
     }, done);
 };
