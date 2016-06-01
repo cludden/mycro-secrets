@@ -19,18 +19,115 @@ module.exports = [
 
 
 ## Background
-Most applications require secrets (sensitive data like passwords, api keys, tokens, etc) to interact with other services, databases, and third party apis. Most applications resort to environment variables for storing this sensitive data, but environment variables can become hard to manage and update. [Vault](https://github.com/hashicorp/vault) has proven to be a very elegant tool for managing these secrets. This hook aims to abstract away the logic involved in fetching secrets and provide a simple and declarative api for specifying the required secrets that an app requires before starting.
+Most applications require secrets (sensitive data like credentials, api keys, tokens, etc) to interact with other services, databases, and third party apis. Most applications resort to environment variables for storing this sensitive data, but environment variables can become hard to manage and update. [Vault](https://github.com/hashicorp/vault) has proven to be a very elegant tool for managing these secrets. This hook aims to abstract away the logic involved in fetching and renewing secrets and provide a simple and declarative api for specifying the required secrets that an app requires before starting.
 
 
-## Process
-This basic process performed by this hook is described below:
+## Getting Started
+1. define your hook config
 
-1. Request secret config from DynamoDB
-2. Ensure we understand the config document
-3. Contact vault for all secrets specified in the config document
-4. Validate our secrets object after all requests have been fulfilled successfully
-5. Make secrets available at `mycro.secrets()`
+    ```javascript
+    // in config/secrets.js
+    const joi = require('joi');
 
+    module.exports = {
+        // define a function for retrieving our 'secrets' config
+        config(mycro, cb) {
+            // fetch your secrets config here
+            cb(null, config);
+        },
+
+        // define a validation function to ensure that the secrets we receive
+        // from vault include everything we require
+        validate(secrets, cb) {
+            joi.validate(secrets, joi.object({
+                bugsnag: joi.object({
+                    apiKey: joi.string().required()
+                }),
+                mongo: joi.object({
+                    host: joi.string().uri().required(),
+                    username: joi.string().required(),
+                    password: joi.string().required()
+                }).required()
+            }).required(), cb);
+        }
+    }
+    ```
+
+2. define a secrets configuration somewhere (dynamo, s3, etc), and pass it to the hook
+
+    ```json
+    {
+        "envs": {
+            "production": {
+                "auth": {
+                    "backend": "userpass",
+                    "options": {
+                        "username": "my-app",
+                        "password": "my-password"
+                    },
+                    "retry": {
+                        "forever": true,
+                        "factor": 2,
+                        "minTimeout": 100,
+                        "maxTimeout": 900000
+                    }
+                },
+                "secrets": {
+                    "/secrets/my-app/production": {
+                        "/bugsnag": "bugsnag",
+                        "/mongo": "mongo"
+                    }
+                }
+            },
+            "development": {
+                "auth": {
+                    "backend": "userpass",
+                    "options": {
+                        "username": "my-app_dev",
+                        "password": "my-password_dev"
+                    },
+                    "retry": {
+                        "forever": true,
+                        "factor": 2,
+                        "minTimeout": 100,
+                        "maxTimeout": 900000
+                    }
+                },
+                "secrets": {
+                    "/secrets/my-app/dev": {
+                        "/bugsnag": "bugsnag",
+                        "/mongo": "mongo"
+                    }
+                },
+            }
+        },
+        "vault": {
+            "url": "http://vault:8200/v1"
+        }
+    }
+    ```
+
+3. include this hook in your `hooks` config
+
+    ```javascript
+    // in config/hooks.js
+    module.exports = [
+        // ..
+        'mycro-secrets',
+        // ..
+    ];
+    ```
+
+4. use your secrets
+
+    ```javascript
+    console.log(mycro.secrets('mongo'))
+    // {
+    //     "host": "localhost",
+    //     "username": "<username>",
+    //     "password": "<password"
+    // }
+    ```
 
 ## General Usage
 1. define a config table in DynamoDB with hash key of type `string` with name `id`
