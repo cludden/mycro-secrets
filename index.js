@@ -5,6 +5,7 @@ const AWS = require('aws-sdk');
 const axios = require('axios');
 const joi = require('joi');
 const ms = require('ms');
+const VaultClient = require('./VaultClient');
 const _ = require('lodash');
 
 module.exports = function secrets(done) {
@@ -49,6 +50,8 @@ module.exports = function secrets(done) {
         sslEnabled: true
     });
 
+    let vault;
+
     async.auto({
         // retrieve service config from dynamo db
         config: function getConfigFromDynamoDB(fn) {
@@ -70,12 +73,26 @@ module.exports = function secrets(done) {
 
         // validate the config object received from dynamodb
         validated: ['config', function validateServiceConfig(fn, r) {
-            let configSchema = joi.object({
-                secrets: joi.object().required(),
-                vault: joi.object({
-                    token: joi.string(),
-                    'test-token': joi.string(),
-                    url: joi.string().required()
+            const optionsSchema = joi.object({
+                secret_renewal: joi.alternatives().try(
+                    joi.string(), joi.number().integer().min(1)
+                ),
+                token_renewal: joi.alternatives().try(
+                    joi.string(), joi.number().integer().min(1)
+                ),
+                url: joi.string()
+            });
+            const configSchema = joi.object({
+                secrets: joi.object({
+                    envs: joi.object().required().pattern(/.+/g, joi.object({
+                        credentials: joi.object({
+                            password: joi.string(),
+                            username: joi.string()
+                        }),
+                        secrets: joi.object().required(),
+                        vault: optionsSchema
+                    })),
+                    vault: optionsSchema
                 }).required()
             }).required();
 
@@ -91,26 +108,40 @@ module.exports = function secrets(done) {
             });
         }],
 
-        // fetch required secrets from vault
-        secrets: ['validated', function fetchSecretsFromVault(fn, r) {
-            let config = flattenPaths(r.validated.secrets, r.validated.vault.url);
-            let env = process.env.NODE_ENV || 'development';
-            let prodToken = r.validated.vault.token;
-            let testToken = r.validated.vault['test-token'];
-            let devToken = process.env.VAULT_TOKEN;
-            let devTestToken = process.env.VAULT_TOKEN_TEST;
-            let token = env === 'test' ? (devTestToken || testToken) : (devToken || prodToken);
-            if (!token) {
+        api: ['validated', function configureVaultApi(fn, r) {
+            const config = r.validated.secrets;
+            const env = process.env.NODE_ENV || 'development';
+            const url = _.get(config, `envs.${env}.vault.url`) || _.get(config, 'vault.url');
+            const credentials = _.get(config, `envs.${env}.credentials`, {});
+
+            if (!_.isString(url)) {
                 return async.setImmediate(function() {
-                    fn(new Error(`Missing required vault token`));
+                    fn(`Missing vault url in secrets config`);
                 });
             }
 
-            let secrets = {};
-            async.each(Object.keys(config), function(path, _fn) {
-                let pathToSet = config[path];
-                let response = null;
-                let task = function requestFromVault(__fn) {
+            vault = new VaultClient({
+                url: url
+            });
+
+            vault.login({
+                type: 'userpass',
+                username: credentials.username,
+                password: credentials.password
+            }, fn);
+        }],
+
+        // fetch required secrets from vault
+        secrets: ['api', function fetchSecretsFromVault(fn, r) {
+            const config = r.validated.secrets;
+            const env = process.env.NODE_ENV || 'development';
+            const secretsConfig = flattenPaths(_.get(config, `envs.${env}.secrets`, {}));
+
+            const secrets = {};
+            async.each(Object.keys(secretsConfig), function(path, _fn) {
+                const pathToSet = secretsConfig[path];
+                const response = null;
+                const task = function requestFromVault(__fn) {
                     axios.get(path, {
                         headers: {
                             'X-Vault-Token': token
@@ -151,12 +182,7 @@ module.exports = function secrets(done) {
                     mycro.log('error', err);
                     return fn(err);
                 }
-                fn(null, {
-                    secrets,
-                    vault: {
-                        token: token
-                    }
-                });
+                fn(null, { secrets });
             });
         }],
 

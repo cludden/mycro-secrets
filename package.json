@@ -30,12 +30,16 @@
     "async": "^1.5.2",
     "aws-sdk": "^2.3.1",
     "axios": "^0.9.1",
+    "backoff": "^2.5.0",
     "joi": "^7.2.3",
     "lodash": "^4.2.1",
-    "ms": "^0.7.1"
+    "ms": "^0.7.1",
+    "retry": "^0.9.0",
+    "vault-client": "^0.1.0"
   },
   "devDependencies": {
     "chai": "^3.5.0",
+    "eslint": "^2.11.1",
     "grunt": "^0.4.5",
     "grunt-mocha-istanbul": "^3.0.1",
     "istanbul": "^0.4.2",
