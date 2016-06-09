@@ -19,7 +19,7 @@ module.exports = [
 
 
 ## Background
-Most applications require secrets (sensitive data like credentials, api keys, tokens, etc) to interact with other services, databases, and third party apis. Most applications resort to environment variables for storing this sensitive data, but environment variables can become hard to manage and update. [Vault](https://github.com/hashicorp/vault) has proven to be a very elegant tool for managing these secrets. This hook aims to abstract away the logic involved in fetching and renewing secrets and provide a simple and declarative api for specifying the required secrets that an app requires before starting.
+Most applications require secrets (sensitive data like credentials, api keys, tokens, etc) to interact with other services, databases, and third party apis. Most applications resort to environment variables for storing this sensitive data, but environment variables can become hard to manage and update. [Vault](https://github.com/hashicorp/vault) has proven to be a very elegant tool for managing these secrets. This hook aims to abstract away the logic involved in fetching and renewing secrets and provide a simple and declarative api for specifying the secrets that an app requires before starting.
 
 
 ## Getting Started

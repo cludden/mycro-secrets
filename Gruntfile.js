@@ -4,10 +4,11 @@ module.exports = function(grunt){
     grunt.initConfig({
         mocha_istanbul: {
             coverage: {
-                src: ['test/index.test.js'],
+                src: ['test/tests/bootstrap.test.js'],
                 options: {
                     coverageFolder: 'coverage',
                     mask: '**/*.test.js',
+                    timeout: 30000
                 }
             },
             partial: {

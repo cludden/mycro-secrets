@@ -9,6 +9,7 @@ module.exports = {
         "afterEach": true,
         "before": true,
         "beforeEach": true,
+        "client": true,
         "context": true,
         "describe": true,
         "it": true,

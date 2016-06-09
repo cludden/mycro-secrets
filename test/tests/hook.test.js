@@ -3,6 +3,7 @@
 const async = require('async');
 const chai = require('chai');
 const hook = require('../../lib');
+const joi = require('joi');
 const sinon = require('sinon');
 const sinonchai = require('sinon-chai');
 const _ = require('lodash');
@@ -49,16 +50,46 @@ describe('basic tests', function() {
         });
 
         it('should fail if the config function returns an invalid secrets config', function(done) {
-            const tests = [];
+            const tests = [{
+                envs: {}
+            }, {
+                envs: {
+                    production: {
+                        auth: {
+                            options: {
+                                username: 'bob',
+                                password: 'smith'
+                            }
+                        }
+                    }
+                }
+            },{
+                vault: {
+                    url: 'https://vault.example.com'
+                }
+            }].map(function(config) {
+                return {
+                    config: {
+                        config: function(mycro, cb) {
+                            setTimeout(function() {
+                                cb(null, config);
+                            }, 0);
+                        },
+                        validate: _.noop
+                    }
+                };
+            });
 
-            async.each(tests, function(test, next) {
+            async.eachSeries(tests, function(test, next) {
                 const mycro = new Mycro();
+                sinon.spy(joi, 'validate');
                 _.merge(mycro._config, { secrets: test.config });
                 hook.call(mycro, function(err) {
                     const e = _.attempt(function() {
                         expect(err).to.exist;
-                        expect(test.config.config).to.have.been.called;
+                        expect(joi.validate).to.have.callCount(2);
                     });
+                    joi.validate.restore();
                     next(e);
                 });
             }, done);

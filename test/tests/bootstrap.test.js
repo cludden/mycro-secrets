@@ -9,6 +9,7 @@ before(function(done) {
             const client = new Vault({
                 url: 'http://vault:8200/v1'
             });
+            global.client = client;
             fn(null, client);
         },
 
