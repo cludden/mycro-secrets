@@ -2,7 +2,7 @@ version: '2'
 services:
   hook:
     build: .
-    command: npm test -- --timeout 30000
+    command: npm test -- --timeout 2000
     links:
      - vault:vault
     volumes:

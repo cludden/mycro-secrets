@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "mocha test/tests/bootstrap.test.js test/tests/ --recursive",
+    "test:some": "mocha test/tests/bootstrap.test.js",
     "coverage": "grunt coverage"
   },
   "repository": {

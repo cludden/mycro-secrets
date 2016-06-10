@@ -14,7 +14,8 @@ module.exports = {
         "describe": true,
         "it": true,
         "mycro": true,
-        "request": true
+        "request": true,
+        "root_token": true
     },
     "rules": {
         "no-console": ["error", {allow: ["log", "warn", "error"]}],

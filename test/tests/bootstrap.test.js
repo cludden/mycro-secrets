@@ -51,10 +51,11 @@ before(function(done) {
 
         userpass: ['unseal', function mountUserpassBackend(fn, r) {
             const vault = r.vault;
+            global.root_token = r.init.root_token;
             vault.post('/sys/auth/userpass', {
                 type: 'userpass'
             }, {
-                headers: { 'x-vault-token': r.init.root_token }
+                headers: { 'x-vault-token': root_token }
             }, fn);
         }],
 
@@ -67,7 +68,7 @@ before(function(done) {
                 ttl: 1000 * 60 * 30,
                 max_ttl: 1000 * 60 * 30
             }, {
-                headers: { 'x-vault-token': r.init.root_token }
+                headers: { 'x-vault-token': root_token }
             }, fn);
         }]
     }, done);
