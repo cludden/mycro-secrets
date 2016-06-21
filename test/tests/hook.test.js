@@ -105,7 +105,7 @@ describe('basic tests', function() {
                                 backend: 'userpass',
                                 options: {
                                     username: 'test',
-                                    password: 'passwor'
+                                    password: 'password'
                                 },
                                 renew_interval: '15m',
                                 retry: {
@@ -130,11 +130,11 @@ describe('basic tests', function() {
                 },
                 validate: function(secrets) {
                     return secrets;
-                },
-                vault: {
-                    login: sinon.stub().yieldsAsync(new Error('something unexpected'))
                 }
             });
+            mycro.vault = {
+                login: sinon.stub().yieldsAsync(new Error('something unexpected'))
+            };
             hook.call(mycro, function(err) {
                 const e = _.attempt(function() {
                     expect(err).to.exist;

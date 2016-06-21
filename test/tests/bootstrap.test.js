@@ -9,6 +9,9 @@ before(function(done) {
             const client = new Vault({
                 url: 'http://vault:8200/v1'
             });
+            client.on('error', function(err) {
+                console.error(err);
+            });
             global.client = client;
             fn(null, client);
         },
