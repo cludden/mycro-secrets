@@ -97,31 +97,24 @@ describe('basic tests', function() {
 
         it('should fail if the vault client is unable to authenticate', function(done) {
             const mycro = new Mycro();
-            mycro.vault = {
-                login: sinon.stub().yieldsAsync(new Error('something unexpected'))
-            };
             _.set(mycro._config, 'secrets', {
                 config: function(mycro, cb) {
                     async.setImmediate(function() {
                         cb(null, {
-                            envs: {
-                                production: {
-                                    auth: {
-                                        backend: 'userpass',
-                                        options: {
-                                            username: 'test',
-                                            password: 'passwor'
-                                        },
-                                        renew_interval: '15m',
-                                        retry: {
-                                            forever: true,
-                                            maxTimeout: 1000 * 60
-                                        }
-                                    },
-                                    secrets: {
-                                        '/secrets/foo': '.'
-                                    }
+                            auth: {
+                                backend: 'userpass',
+                                options: {
+                                    username: 'test',
+                                    password: 'passwor'
+                                },
+                                renew_interval: '15m',
+                                retry: {
+                                    forever: true,
+                                    maxTimeout: 1000 * 60
                                 }
+                            },
+                            secrets: {
+                                '/secrets/foo': '.'
                             },
                             vault: {
                                 url: 'http://vault:8200/v1'
@@ -137,6 +130,9 @@ describe('basic tests', function() {
                 },
                 validate: function(secrets) {
                     return secrets;
+                },
+                vault: {
+                    login: sinon.stub().yieldsAsync(new Error('something unexpected'))
                 }
             });
             hook.call(mycro, function(err) {

@@ -1,6 +1,5 @@
 'use strict';
 
-const async = require('async');
 const expect = require('chai').expect;
 const Secret = require('../../../lib/service');
 const sinon = require('sinon');
