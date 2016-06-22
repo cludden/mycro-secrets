@@ -1,15 +1,11 @@
 'use strict';
 
 const async = require('async');
-const chai = require('chai');
+const expect = require('chai').expect;
 const hook = require('../../lib');
 const joi = require('joi');
 const sinon = require('sinon');
-const sinonchai = require('sinon-chai');
 const _ = require('lodash');
-
-chai.use(sinonchai);
-const expect = chai.expect;
 
 function Mycro() {
     this._config = {};

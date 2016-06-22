@@ -1,7 +1,11 @@
 'use strict';
 
 const async = require('async');
+const chai = require('chai');
+const sinonchai = require('sinon-chai');
 const Vault = require('vault-client');
+
+chai.use(sinonchai);
 
 before(function(done) {
     async.auto({
@@ -11,6 +15,23 @@ before(function(done) {
             });
             client.on('error', function(err) {
                 console.error(err);
+            });
+            client.client.interceptors.request.use(function(config) {
+                //console.log('VAULT:: ', config.method, config.url);
+                return config;
+            });
+            client.client.interceptors.response.use(function(res) {
+                console.log('-----------------------------------------------------------------');
+                console.log(`${res.config.method} ${res.config.url} ${res.status}`);
+                console.log(`${JSON.stringify(res.config.headers)}`);
+                console.log(`${JSON.stringify(res.data)}`);
+                return res;
+            }, function(res) {
+                console.log('-----------------------------------------------------------------');
+                console.log(`${res.config.method} ${res.config.url} ${res.status}`);
+                console.log(`${JSON.stringify(res.config.headers)}`);
+                console.log(`${JSON.stringify(res.data)}`);
+                return res;
             });
             global.client = client;
             fn(null, client);
@@ -68,8 +89,8 @@ before(function(done) {
                 username: 'test',
                 password: 'password',
                 policies: 'root',
-                ttl: 1000 * 60 * 30,
-                max_ttl: 1000 * 60 * 30
+                ttl: '720h',
+                max_ttl: '720h'
             }, {
                 headers: { 'x-vault-token': root_token }
             }, fn);

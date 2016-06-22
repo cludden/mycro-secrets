@@ -4,6 +4,8 @@ const async = require('async');
 const expect = require('chai').expect;
 const hook = require('../../../index');
 const joi = require('joi');
+const moment = require('moment');
+const sinon = require('sinon');
 const _ = require('lodash');
 
 function Mycro() {
@@ -14,11 +16,15 @@ function Mycro() {
 
 describe('integration tests', function() {
     it('test 1', function(done) {
+        const timeout = global.setTimeout;
+        let clock;
+        sinon.spy(global.client, 'login');
+        sinon.spy(global.client, 'get');
         async.auto({
             add: function(fn) {
                 client.post('/secret/foo', {
                     bar: 'baz',
-                    ttl: '15m'
+                    ttl: '20m'
                 }, {
                     headers: { 'x-vault-token': global.root_token }
                 }, fn);
@@ -35,7 +41,8 @@ describe('integration tests', function() {
                                     options: {
                                         username: 'test',
                                         password: 'password'
-                                    }
+                                    },
+                                    renew_interval: '15m'
                                 },
                                 secrets: {
                                     '/secret/foo': '.'
@@ -70,9 +77,12 @@ describe('integration tests', function() {
                 };
                 _.set(mycro, '_config.secrets', config);
                 mycro.vault = global.client;
+                clock = sinon.useFakeTimers();
                 hook.call(mycro, function(err) {
                     const e = _.attempt(function() {
                         expect(err).to.not.exist;
+                        expect(global.client.login).to.have.been.called;
+                        expect(global.client.get).to.have.callCount(1);
                         expect(mycro.services).to.have.property('secret');
                         const secrets = mycro.services.secret.get();
                         expect(secrets).to.be.an('object');
@@ -81,8 +91,24 @@ describe('integration tests', function() {
                     });
                     fn(e);
                 });
+                clock.tick(10);
+            }],
+
+            timetravel: ['hook', function(fn) {
+                async.eachSeries([16, 5], function(m, next) {
+                    clock.tick(moment.duration(m, 'minutes').asMilliseconds());
+                    timeout.call(global, next, 100);
+                }, function() {
+                    const e = _.attempt(function() {
+                        expect(global.client.login).to.have.callCount(2);
+                        expect(global.client.get).to.have.callCount(2);
+                    });
+                    fn(e);
+                });
             }]
         }, function(err) {
+            global.client.login.restore();
+            global.client.get.restore();
             global.client.delete('/secret/foo', {
                 headers: { 'x-vault-token': global.root_token }
             }, function(e) {

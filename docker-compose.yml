@@ -9,7 +9,7 @@ services:
      - .:/home/app/src
      - /home/app/src/node_modules
   vault:
-    image: voxxit/vault
+    image: cgswong/vault
     command: server -config=/home/app/config.hcl
     volumes:
      - ./test/vault:/home/app

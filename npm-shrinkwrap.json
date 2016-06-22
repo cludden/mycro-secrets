@@ -944,11 +944,6 @@
       "from": "mkdirp@>=0.5.0 <0.6.0",
       "resolved": "https://registry.npmjs.org/mkdirp/-/mkdirp-0.5.1.tgz"
     },
-    "moment": {
-      "version": "2.13.0",
-      "from": "moment@>=2.0.0 <3.0.0",
-      "resolved": "https://registry.npmjs.org/moment/-/moment-2.13.0.tgz"
-    },
     "morgan": {
       "version": "1.7.0",
       "from": "morgan@>=1.6.1 <2.0.0",
