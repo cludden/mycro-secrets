@@ -134,7 +134,7 @@ describe('basic tests', function() {
             hook.call(mycro, function(err) {
                 const e = _.attempt(function() {
                     expect(err).to.exist;
-                    expect(mycro.vault.login).to.have.been.called;
+                    expect(mycro._config.secrets.vault.login).to.have.been.called;
                 });
                 done(e);
             });

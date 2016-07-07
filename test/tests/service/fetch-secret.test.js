@@ -10,7 +10,7 @@ const _ = require('lodash');
 
 describe('[service] secret.fetchSecret()', function() {
 
-    it('should fail all attempts to retreive secret fail', function(done) {
+    it('should fail if all attempts to retreive secret fail', function(done) {
         const vault = new Vault({ url: 'http://vault:8200/v1' });
         const secret = new Secret(vault, {
             hook: {
@@ -131,6 +131,53 @@ describe('[service] secret.fetchSecret()', function() {
                 _.extend.restore();
                 done(e);
             });
+        });
+    });
+
+    it('should allow multiple secrets to be merged into the same address', function(done) {
+        const vault = new Vault({ url: 'http://vault:8200/v1' });
+        const secret = new Secret(vault, {
+            hook: {
+                retry: {
+                    retries: 2,
+                    minTimeout: 10,
+                    factor: 1,
+                    maxTimeout: 10
+                }
+            }
+        });
+        const stub = sinon.stub(vault, 'get');
+        stub.onCall(0).yieldsAsync(null, {
+            lease_duration: 0,
+            data: {
+                this: 'foo'
+            }
+        });
+        stub.onCall(1).yieldsAsync(null, {
+            lease_duration: 0,
+            data: {
+                that: 'bar'
+            }
+        });
+        async.series([
+            function(fn) {
+                secret.fetchSecret('/secret/this', 'foo', fn);
+            },
+
+            function(fn) {
+                secret.fetchSecret('/secret/that', 'foo', fn);
+            }
+        ], function(err) {
+            const e = _.attempt(function() {
+                expect(err).to.not.exist;
+                const secrets = secret.get();
+                expect(secrets).to.be.an('object').with.all.keys('foo');
+                expect(secrets.foo).to.be.an('object').with.all.keys('this', 'that');
+                expect(secrets.foo.this).to.equal('foo');
+                expect(secrets.foo.that).to.equal('bar');
+            });
+            stub.restore();
+            done(e);
         });
     });
 });
