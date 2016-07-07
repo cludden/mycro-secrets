@@ -8,7 +8,7 @@ const _ = require('lodash');
 
 function Mycro() {
     this.log = function(...args) {
-        console.log.apply(console, args.slice(1));
+        console.log.apply(console, args);
     };
 }
 
@@ -45,6 +45,7 @@ describe('integration tests', function() {
                     },
 
                     log(...args) {
+                        console.log.apply(console, args);
                         mycro.log.apply(mycro, ['info'].concat(args));
                     },
 
@@ -66,6 +67,13 @@ describe('integration tests', function() {
                     vault: global.client
                 };
                 _.set(mycro, '_config.secrets', config);
+                global.client.client.interceptors.response.use(function(res) {
+                    console.log(res.config.method, res.config.url, res.status, res.data);
+                    return res;
+                }, function(res) {
+                    console.log(res.config.method, res.config.url, res.status, res.data);
+                    return res;
+                });
                 hook.call(mycro, function(err) {
                     const e = _.attempt(function() {
                         expect(err).to.not.exist;
@@ -74,7 +82,7 @@ describe('integration tests', function() {
                 });
             }]
         }, function(err) {
-            global.client.del('/secret/foo', {
+            global.client.delete('/secret/foo', {}, {
                 headers: { 'x-vault-token': global.root_token }
             }, function(e) {
                 done(err || e);
