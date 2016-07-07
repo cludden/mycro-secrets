@@ -8,27 +8,6 @@ const _ = require('lodash');
 
 describe('[service] fetchSecrets()', function() {
     context('(expected failures)', function() {
-        it('should fail if no config is found for the specified environment', function(done) {
-            const vault = new Vault({ url: 'http://vault:8200/v1'});
-            const secret = new Secret(vault, {
-                hook: {
-                    env: 'test'
-                },
-                secrets: {
-                    envs: {
-                        production: {
-                            '/secrets/foo': '.'
-                        }
-                    }
-                }
-            });
-            secret.fetchSecrets(function(err) {
-                const e = _.attempt(function() {
-                    expect(err).to.be.an('error');
-                });
-                done(e);
-            });
-        });
 
         it('should fail if the environment config contains no paths', function(done) {
             const vault = new Vault({ url: 'http://vault:8200/v1'});
@@ -37,9 +16,7 @@ describe('[service] fetchSecrets()', function() {
                     env: 'test'
                 },
                 secrets: {
-                    envs: {
-                        test: {}
-                    }
+                    secrets: {}
                 }
             });
             secret.fetchSecrets(function(err) {
@@ -57,10 +34,8 @@ describe('[service] fetchSecrets()', function() {
                     env: 'production'
                 },
                 secrets: {
-                    envs: {
-                        production: {
-                            '/secret/app': '.'
-                        }
+                    secrets: {
+                        '/secret/app': '.'
                     }
                 }
             });
@@ -84,8 +59,8 @@ describe('[service] fetchSecrets()', function() {
                     validate
                 },
                 secrets: {
-                    envs: {
-                        production: {
+                    secrets: {
+                        secrets: {
                             '/secret/app': '.'
                         }
                     }
@@ -125,8 +100,8 @@ describe('[service] fetchSecrets()', function() {
                     }
                 },
                 secrets: {
-                    envs: {
-                        production: {
+                    secrets: {
+                        secrets: {
                             '/secret/app': '.'
                         }
                     }
@@ -164,8 +139,8 @@ describe('[service] fetchSecrets()', function() {
                     }
                 },
                 secrets: {
-                    envs: {
-                        production: {
+                    secrets: {
+                        secrets: {
                             '/secret/app': '.'
                         }
                     }

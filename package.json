@@ -1,6 +1,6 @@
 {
   "name": "mycro-secrets",
-  "version": "0.6.0-0",
+  "version": "0.6.0-1",
   "description": "mycro hook for loading secrets from the environment or a vault server",
   "main": "index.js",
   "scripts": {
@@ -37,7 +37,7 @@
     "lodash": "^4.2.1",
     "ms": "^0.7.1",
     "retry": "^0.9.0",
-    "vault-client": "^0.1.0"
+    "vault-client": "^0.1.2"
   },
   "devDependencies": {
     "chai": "^3.5.0",

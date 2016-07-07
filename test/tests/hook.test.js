@@ -1,15 +1,11 @@
 'use strict';
 
 const async = require('async');
-const chai = require('chai');
+const expect = require('chai').expect;
 const hook = require('../../lib');
 const joi = require('joi');
 const sinon = require('sinon');
-const sinonchai = require('sinon-chai');
 const _ = require('lodash');
-
-chai.use(sinonchai);
-const expect = chai.expect;
 
 function Mycro() {
     this._config = {};
@@ -105,7 +101,7 @@ describe('basic tests', function() {
                                 backend: 'userpass',
                                 options: {
                                     username: 'test',
-                                    password: 'passwor'
+                                    password: 'password'
                                 },
                                 renew_interval: '15m',
                                 retry: {
@@ -130,11 +126,11 @@ describe('basic tests', function() {
                 },
                 validate: function(secrets) {
                     return secrets;
-                },
-                vault: {
-                    login: sinon.stub().yieldsAsync(new Error('something unexpected'))
                 }
             });
+            mycro.vault = {
+                login: sinon.stub().yieldsAsync(new Error('something unexpected'))
+            };
             hook.call(mycro, function(err) {
                 const e = _.attempt(function() {
                     expect(err).to.exist;
