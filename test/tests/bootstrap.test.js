@@ -16,21 +16,18 @@ before(function(done) {
             client.on('error', function(err) {
                 console.error(err);
             });
-            client.client.interceptors.request.use(function(config) {
-                //console.log('VAULT:: ', config.method, config.url);
-                return config;
-            });
             client.client.interceptors.response.use(function(res) {
                 console.log('-----------------------------------------------------------------');
-                console.log(`${res.config.method} ${res.config.url} ${res.status}`);
-                console.log(`${JSON.stringify(res.config.headers)}`);
-                console.log(`${JSON.stringify(res.data)}`);
+                console.log(`RESPONSE: ${res.config.method} ${res.config.url} ${res.status}`);
+                console.log(JSON.stringify(res.data));
+                console.log('-----------------------------------------------------------------');
                 return res;
             }, function(res) {
                 console.log('-----------------------------------------------------------------');
-                console.log(`${res.config.method} ${res.config.url} ${res.status}`);
-                console.log(`${JSON.stringify(res.config.headers)}`);
-                console.log(`${JSON.stringify(res.data)}`);
+                console.log(`RESPONSE: ${res.config.method} ${res.config.url} ${res.status}`);
+                console.log(JSON.stringify(res.config.headers));
+                console.log(JSON.stringify(res.data));
+                console.log('-----------------------------------------------------------------');
                 return res;
             });
             global.client = client;

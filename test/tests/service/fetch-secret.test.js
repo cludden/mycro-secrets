@@ -16,9 +16,12 @@ describe('[service] secret.fetchSecret()', function() {
             hook: {
                 retry: {
                     retries: 2,
-                    minTimeout: 10,
+                    minTimeout: ms('1m'),
                     factor: 1,
-                    maxTimeout: 10
+                    maxTimeout: ms('1m')
+                },
+                log(...args) {
+                    console.error.apply(console, args);
                 }
             }
         });
@@ -30,7 +33,7 @@ describe('[service] secret.fetchSecret()', function() {
             err = e;
         });
         async.eachSeries(_.range(3), function(i, next) {
-            tick(timeout, clock, 11, next);
+            tick(timeout, clock, '1.1m', next);
         }, function() {
             const e = _.attempt(function() {
                 expect(err).to.exist;
@@ -55,7 +58,6 @@ describe('[service] secret.fetchSecret()', function() {
                 }
             }
         });
-        sinon.spy(_, 'extend');
         sinon.stub(vault, 'get').yieldsAsync(null, {
             lease_duration: 0,
             data: {
@@ -66,12 +68,9 @@ describe('[service] secret.fetchSecret()', function() {
             const e = _.attempt(function() {
                 expect(err).to.not.exist;
                 expect(vault.get).to.have.callCount(1);
-                expect(_.extend).to.have.been.called;
-                expect(_.extend.lastCall.args[1]).to.be.an('object').with.property('bar', 'baz');
                 expect(result).to.be.an('object').with.property('bar', 'baz');
             });
             vault.get.restore();
-            _.extend.restore();
             done(e);
         });
     });
@@ -90,7 +89,6 @@ describe('[service] secret.fetchSecret()', function() {
                 }
             }
         });
-        sinon.spy(_, 'extend');
         const stub = sinon.stub(vault, 'get');
         stub.onCall(0).yieldsAsync(null, {
             lease_duration: ms('15m') / 1000,
@@ -109,8 +107,6 @@ describe('[service] secret.fetchSecret()', function() {
             const e = _.attempt(function() {
                 expect(err).to.not.exist;
                 expect(vault.get).to.have.callCount(1);
-                expect(_.extend).to.have.been.called;
-                expect(_.extend.lastCall.args[1]).to.be.an('object').with.property('bar', 'baz');
                 expect(result).to.be.an('object').with.property('bar', 'baz');
                 expect(secret.renewals).to.have.property('/secret/foo');
             });
@@ -128,7 +124,6 @@ describe('[service] secret.fetchSecret()', function() {
                 });
                 clock.restore();
                 vault.get.restore();
-                _.extend.restore();
                 done(e);
             });
         });

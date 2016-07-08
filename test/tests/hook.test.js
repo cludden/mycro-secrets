@@ -126,11 +126,11 @@ describe('basic tests', function() {
                 },
                 validate: function(secrets) {
                     return secrets;
+                },
+                vault: {
+                    login: sinon.stub().yieldsAsync(new Error('something unexpected'))
                 }
             });
-            mycro.vault = {
-                login: sinon.stub().yieldsAsync(new Error('something unexpected'))
-            };
             hook.call(mycro, function(err) {
                 const e = _.attempt(function() {
                     expect(err).to.exist;

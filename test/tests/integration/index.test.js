@@ -55,7 +55,6 @@ describe('integration tests', function() {
                     },
 
                     log(...args) {
-                        console.log.apply(console, args);
                         mycro.log.apply(mycro, ['info'].concat(args));
                     },
 
@@ -74,19 +73,14 @@ describe('integration tests', function() {
                         joi.validate(secrets, schema, {
                             allowUnknown: true
                         }, cb);
+                    },
+
+                    vault() {
+                        return global.client;
                     }
                 };
                 _.set(mycro, '_config.secrets', config);
-                mycro.vault = global.client;
                 clock = sinon.useFakeTimers();
-                global.client.client.interceptors.response.use(function(res) {
-                    console.log(res.config.method, res.config.url, res.status, res.data);
-                    return res;
-                }, function(res) {
-                    console.log(res.config.method, res.config.url, res.status, res.data);
-                    return res;
-                });
-
                 hook.call(mycro, function(err) {
                     const e = _.attempt(function() {
                         expect(err).to.not.exist;
@@ -118,6 +112,7 @@ describe('integration tests', function() {
         }, function(err) {
             global.client.login.restore();
             global.client.get.restore();
+            clock.restore();
             global.client.delete('/secret/foo', {}, {
                 headers: { 'x-vault-token': global.root_token }
             }, function(e) {
