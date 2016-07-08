@@ -26,7 +26,7 @@ This hook will export a `secret` service at `mycro.services.secret` as well as d
 
 
 ## Getting Started
-1. define a secrets configuration somewhere (dynamo, s3, inline, etc), and retrieve it via the `config` method defined in step 2.
+1. define one or more secret configurations somewhere (DynamoDB, S3, inline, etc), and retrieve it via the `config` method defined in step 2.
 
     ```json
     {
@@ -49,12 +49,9 @@ This hook will export a `secret` service at `mycro.services.secret` as well as d
     }
     ```
 
-2. define your hook config
+2. specify hook configuration in `/config/secrets.js`
 
     ```javascript
-    // in config/secrets.js
-    const joi = require('joi');
-
     module.exports = {
         // define a function for retrieving a 'secrets' configuration object
         config(mycro, cb) {
@@ -65,6 +62,7 @@ This hook will export a `secret` service at `mycro.services.secret` as well as d
         // define a validation function to ensure that the secrets we receive
         // from vault include everything we require
         validate(secrets, cb) {
+            const joi = require('joi');
             joi.validate(secrets, joi.object({
                 bugsnag: joi.object({
                     apiKey: joi.string().required()
@@ -116,7 +114,7 @@ This hook will export a `secret` service at `mycro.services.secret` as well as d
 
 ## API
 #### Hook Configuration
-This hook can be configured by defining a configuration file at `config/secrets.js`. The file should export a configuration object outlined below:
+This hook can be configured by defining a configuration file at `/config/secrets.js`. The file should export a configuration object outlined below:
 ```javascript
 module.exports = function(mycro) {
     return {
@@ -290,14 +288,17 @@ A configuration object that instructs the `secret` service how to communicate wi
 #### Service API
 This hook exports a `secret` service available at `mycro.services.secret`. The service will first authenticate with vault and then retrieve all secrets defined in the secrets configuration returned by the hook. Vault access tokens will be renewed periodically based on the lease_duration returned from the login call. Any secrets that have a lease_duration greater than 0 will be renewed periodically based on their lease_duration.
 
-##### Service.fetchSecrets(cb)
+##### Service.fetchSecrets(cb) {Function}
 Fetch all secrets defined in the secrets configuration.
 
-##### Service.fetchSecret(path, address, [cb])
+##### Service.fetchSecret(path, address, [cb]) {Function}
 Fetch a single secret at the given `path` and set it on the secret store at the specified `address`. If address is equal to `.`, then the returned data will be merged directly with the secret store.
 
-##### Service.get([path])
+##### Service.get([path]) {Function}
 Retrieve a branch of the secret store. If path is omitted, the entire secret store is returned.
+
+##### Service.vault {Object}
+The vault-client associated with the Service.
 
 
 ## Testing
