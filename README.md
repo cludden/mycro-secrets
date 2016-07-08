@@ -304,14 +304,8 @@ The vault-client associated with the Service.
 ## Testing
 Run the test suite:
 ```bash
-npm test
+docker-compose up
 ```
-
-Run coverage:
-```bash
-grunt coverage
-```
-
 
 ## Contributing
 1. [Fork it](https://github.com/cludden/mycro-secrets/fork)
